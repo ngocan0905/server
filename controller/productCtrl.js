@@ -80,6 +80,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
     throw new Error(error);
   }
 });
+// get product by id
 const getaProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
   try {

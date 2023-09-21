@@ -29,12 +29,7 @@ const router = express.Router();
 router.post("/register", createUser);
 router.post("/forgot-password", forgotPasswordToken);
 router.put("/reset-password/:token", resetPassword);
-router.put(
-  "/order/update-order/:id",
-  authMiddleware,
-  isAdmin,
-  updateOrderStatus
-);
+router.put("/order/update-order/:id", authMiddleware, isAdmin, updateOrderStatus);
 router.put("/password", authMiddleware, updatePassword);
 router.post("/login", loginUser);
 router.post("/admin-login", loginAdmin);
@@ -48,7 +43,7 @@ router.get("/refresh", handleRefeshToken);
 router.get("/logout", logoutUser);
 router.get("/wishlist", authMiddleware, getWishList);
 router.get("/cart", authMiddleware, getUserCart);
-router.get("/:id", authMiddleware, isAdmin, getUser);
+router.get("/:id", getUser);
 router.put("/edit-user", authMiddleware, updateUser);
 router.put("/save-address", authMiddleware, saveAddress);
 router.put("/block-user/:id", authMiddleware, isAdmin, blockUser);

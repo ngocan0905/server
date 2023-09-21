@@ -1,8 +1,9 @@
 const express = require("express");
+
 const dbConnect = require("./config/dbConnect");
 const app = express();
 const dotenv = require("dotenv").config();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT;
 const authRouter = require("./routers/authRoute");
 const productRouter = require("./routers/productRoute");
 const blogRouter = require("./routers/blogRoute");
@@ -10,7 +11,16 @@ const productCategoryRouter = require("./routers/productCategoryRoute");
 const blogCategoryRouter = require("./routers/blogCategoryRoute");
 const brandRouter = require("./routers/brandRoute");
 const couponRouter = require("./routers/couponRoute");
+const colorRouter = require("./routers/colorRoute");
+const enqRouter = require("./routers/enqRoute");
 const bodyParser = require("body-parser");
+app.use(function (req, res, next) {
+  res.header("Access-Control-Allow-Origin", "http://localhost:5173");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+  next();
+});
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
 const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
@@ -26,6 +36,8 @@ app.use("/api/proCat", productCategoryRouter);
 app.use("/api/blogCat", blogCategoryRouter);
 app.use("/api/brand", brandRouter);
 app.use("/api/coupon", couponRouter);
+app.use("/api/color", colorRouter);
+app.use("/api/enquiry", enqRouter);
 app.use(errorHandler);
 app.use(notFound);
 app.listen(PORT, () => {

@@ -39,11 +39,7 @@ var blogSchema = new mongoose.Schema(
         ref: "user",
       },
     ],
-    imgaes: {
-      type: String,
-      default:
-        "https://tenten.vn/tin-tuc/wp-content/uploads/2021/09/blog-la-gi-4.jpg",
-    },
+    images: [],
     author: {
       type: String,
       default: "Admin",

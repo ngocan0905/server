@@ -40,7 +40,7 @@ router.delete("/cart", authMiddleware, emptyCart);
 router.get("/all-user", getAllUser);
 router.get("/get-order", authMiddleware, getOrder);
 router.get("/refresh", handleRefeshToken);
-router.get("/logout", logoutUser);
+router.get("/logout", authMiddleware, logoutUser);
 router.get("/wishlist", authMiddleware, getWishList);
 router.get("/cart", authMiddleware, getUserCart);
 router.get("/:id", getUser);

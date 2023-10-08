@@ -51,6 +51,7 @@ const loginUser = asyncHandler(async (req, res) => {
       lastname: findUser?.lastName,
       email: findUser?.email,
       mobile: findUser?.mobile,
+      wishlist: findUser?.wishlist,
       token: generateToken(findUser?._id),
     });
   } else {
@@ -155,10 +156,7 @@ const logoutUser = asyncHandler(async (req, res) => {
   }
   const refreshToken = cookie.refreshToken;
 
-  const user = await User.findOneAndUpdate(
-    { refreshToken },
-    { $set: { refreshToken: "" } }
-  );
+  const user = await User.findOneAndUpdate({ refreshToken }, { $set: { refreshToken: "" } });
 
   if (!user) {
     res.clearCookie("refreshToken", {
@@ -310,34 +308,52 @@ const userCart = asyncHandler(async (req, res) => {
   const { cart } = req.body;
   const { _id } = req.user;
   validateMongoDbId(_id);
+
   try {
-    let products = [];
     const user = await User.findById(_id);
-    const alreadyExistCart = await Cart.findOne({ orderby: user._id });
-    if (alreadyExistCart) {
-      alreadyExistCart.remove();
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
+
+    // Kiểm tra sự tồn tại của giỏ hàng và xóa nó nếu đã tồn tại
+    const existingCart = await Cart.findOne({ orderby: user._id });
+    if (existingCart) {
+      await Cart.deleteOne({ _id: existingCart._id });
+    }
+
+    const products = [];
     for (let i = 0; i < cart.length; i++) {
-      let object = {};
-      object.product = cart[i]._id;
-      object.count = cart[i].count;
-      object.color = cart[i].color;
-      let getPrice = await Product.findById(cart[i]._id).select("price").exec();
-      object.price = getPrice.price;
-      products.push(object);
+      const product = await Product.findById(cart[i]._id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const cartItem = {
+        product: product._id,
+        count: cart[i].count,
+        color: cart[i].color,
+        price: product.price,
+      };
+      products.push(cartItem);
     }
+
     let cartTotal = 0;
-    for (let i = 0; i < products.length; i++) {
-      cartTotal = cartTotal + products[i].price * products[i].count;
-    }
-    let newCart = await new Cart({
+    products.forEach((product) => {
+      cartTotal += product.price * product.count;
+    });
+
+    const newCart = new Cart({
       products,
       cartTotal,
-      orderby: user?._id,
-    }).save();
+      orderby: user._id,
+    });
+
+    await newCart.save();
     res.json(newCart);
   } catch (error) {
-    throw new Error(error);
+    // Xử lý lỗi một cách tường minh ở đây
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
@@ -346,9 +362,7 @@ const getUserCart = asyncHandler(async (req, res) => {
   const { _id } = req.user;
   validateMongoDbId(_id);
   try {
-    const cart = await Cart.findOne({ orderby: _id }).populate(
-      "products.product"
-    );
+    const cart = await Cart.findOne({ orderby: _id }).populate("products.product");
     res.json(cart);
   } catch (error) {
     throw new Error(error);
@@ -378,10 +392,7 @@ const applyCoupon = asyncHandler(async (req, res) => {
   let { products, cartTotal } = await Cart.findOne({
     orderby: user._id,
   }).populate("products.product");
-  let totalAfterDiscount = (
-    cartTotal -
-    (cartTotal * validCoupon.discount) / 100
-  ).toFixed(2);
+  let totalAfterDiscount = (cartTotal - (cartTotal * validCoupon.discount) / 100).toFixed(2);
   await Cart.findOneAndUpdate(
     { orderby: user._id },
     {
@@ -439,9 +450,7 @@ const getOrder = asyncHandler(async (req, res) => {
   const { _id } = req.user;
   validateMongoDbId(_id);
   try {
-    const userOrders = await Order.findOne({ orderby: _id })
-      .populate("products.product")
-      .exec();
+    const userOrders = await Order.findOne({ orderby: _id }).populate("products.product").exec();
     res.json(userOrders);
   } catch (error) {
     throw new Error(error);

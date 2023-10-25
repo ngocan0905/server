@@ -16,7 +16,7 @@ const {
   loginAdmin,
   getWishList,
   saveAddress,
-  userCart,
+  addProductToCart,
   getUserCart,
   emptyCart,
   applyCoupon,
@@ -33,7 +33,7 @@ router.put("/order/update-order/:id", authMiddleware, isAdmin, updateOrderStatus
 router.put("/password", authMiddleware, updatePassword);
 router.post("/login", loginUser);
 router.post("/admin-login", loginAdmin);
-router.post("/cart", authMiddleware, userCart);
+router.post("/cart", authMiddleware, addProductToCart);
 router.post("/cart/apply-coupon", authMiddleware, applyCoupon);
 router.post("/cart/cash-order", authMiddleware, createOrder);
 router.delete("/cart", authMiddleware, emptyCart);

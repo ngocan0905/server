@@ -303,55 +303,48 @@ const getWishList = asyncHandler(async (req, res) => {
     throw new Error(error);
   }
 });
-//add to   cart
-const userCart = asyncHandler(async (req, res) => {
+//add to cart
+const addProductToCart = asyncHandler(async (req, res) => {
   const { cart } = req.body;
+  console.log(cart);
   const { _id } = req.user;
   validateMongoDbId(_id);
-
   try {
     const user = await User.findById(_id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-
-    // Kiểm tra sự tồn tại của giỏ hàng và xóa nó nếu đã tồn tại
-    const existingCart = await Cart.findOne({ orderby: user._id });
-    if (existingCart) {
-      await Cart.deleteOne({ _id: existingCart._id });
+    let existingCart = await Cart.findOne({ orderby: user._id });
+    if (!existingCart) {
+      existingCart = new Cart({ orderby: user._id, products: [] });
     }
-
-    const products = [];
     for (let i = 0; i < cart.length; i++) {
       const product = await Product.findById(cart[i]._id);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
-
-      const cartItem = {
-        product: product._id,
-        count: cart[i].count,
-        color: cart[i].color,
-        price: product.price,
-      };
-      products.push(cartItem);
+      const existingProductIndex = existingCart.products.findIndex(
+        (item) => item.product.toString() === product._id.toString() && item.color === cart[i].color
+      );
+      if (existingProductIndex !== -1) {
+        existingCart.products[existingProductIndex].count += cart[i].count;
+      } else {
+        existingCart.products.push({
+          product: product._id,
+          count: cart[i].count,
+          color: cart[i].color,
+          price: product.price,
+        });
+      }
     }
+    existingCart.cartTotal = existingCart.products.reduce(
+      (total, product) => total + product.price * product.count,
+      0
+    );
 
-    let cartTotal = 0;
-    products.forEach((product) => {
-      cartTotal += product.price * product.count;
-    });
-
-    const newCart = new Cart({
-      products,
-      cartTotal,
-      orderby: user._id,
-    });
-
-    await newCart.save();
-    res.json(newCart);
+    await existingCart.save();
+    res.json(existingCart);
   } catch (error) {
-    // Xử lý lỗi một cách tường minh ở đây
     console.error(error);
     res.status(500).json({ message: "Internal Server Error" });
   }
@@ -494,7 +487,7 @@ module.exports = {
   resetPassword,
   getWishList,
   saveAddress,
-  userCart,
+  addProductToCart,
   getUserCart,
   emptyCart,
   applyCoupon,

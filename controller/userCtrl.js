@@ -111,12 +111,13 @@ const saveAddress = asyncHandler(async (req, res) => {
 // get all user
 const getAllUser = asyncHandler(async (req, res) => {
   try {
-    const getUsers = await User.find();
+    const getUsers = await User.find().populate("cart");
     res.json(getUsers);
   } catch (error) {
     throw new Error(error);
   }
 });
+
 // get single user
 const getUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -306,7 +307,6 @@ const getWishList = asyncHandler(async (req, res) => {
 //add to cart
 const addProductToCart = asyncHandler(async (req, res) => {
   const { cart } = req.body;
-  console.log(cart);
   const { _id } = req.user;
   validateMongoDbId(_id);
   try {
@@ -371,6 +371,38 @@ const emptyCart = asyncHandler(async (req, res) => {
     res.json(cart);
   } catch (error) {
     throw new Error(error);
+  }
+});
+// delete product in cart by id
+const removeProductInCart = asyncHandler(async (req, res) => {
+  const { _id } = req.user;
+  const { id: productId } = req.params; // Thay đổi nếu bạn truyền productId từ front-end
+
+  try {
+    // Tìm người dùng và giỏ hàng của họ
+    const user = await User.findById(_id);
+    const cart = await Cart.findOne({ orderby: user._id });
+
+    if (!cart) {
+      return res.status(404).json({ message: "Cart not found" });
+    }
+
+    // Xóa sản phẩm từ danh sách sản phẩm trong giỏ hàng
+    cart.products = cart.products.filter((item) => item.product.toString() !== productId);
+
+    // Cập nhật tổng giá trị giỏ hàng sau khi xóa sản phẩm
+    cart.cartTotal = cart.products.reduce(
+      (total, product) => total + product.price * product.count,
+      0
+    );
+
+    // Lưu thay đổi vào cơ sở dữ liệu
+    await cart.save();
+
+    res.json(cart); // Trả về giỏ hàng sau khi xóa sản phẩm
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
@@ -490,6 +522,7 @@ module.exports = {
   addProductToCart,
   getUserCart,
   emptyCart,
+  removeProductInCart,
   applyCoupon,
   createOrder,
   getOrder,

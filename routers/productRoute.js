@@ -9,6 +9,7 @@ const {
   rating,
   uploadImages,
   deleteImages,
+  searchProductByName,
 } = require("../controller/productCtrl");
 const { authMiddleware, isAdmin } = require("../middlewares/authMiddleware");
 const { uploadPhoto, productImgResize } = require("../middlewares/uploadImages");
@@ -24,6 +25,7 @@ router.post(
   uploadImages
 );
 router.get("/", getAllProduct);
+router.get("/search", searchProductByName);
 router.get("/:id", getaProduct);
 router.put("/wishlist", authMiddleware, addToWishList);
 router.put("/rating", authMiddleware, rating);

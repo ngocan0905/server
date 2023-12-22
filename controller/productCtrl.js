@@ -5,14 +5,28 @@ const validateMongoDbId = require("../utils/validateMongodbId");
 const { cloudinaryUploadImg, cloudinaryDeleteImg } = require("../utils/cloudinary");
 const fs = require("fs");
 const slugify = require("slugify");
+// create product
 const createProduct = asyncHandler(async (req, res) => {
   try {
-    if (req.body.title) {
-      req.body.slug = slugify(req.body.title);
+    const { title, images } = req.body;
+    if (title) {
+      req.body.slug = slugify(title);
     }
     const newProduct = await Product.create(req.body);
+    if (images & (images.length > 0)) {
+      const uploadImages = [];
+      const uploader = (path) => cloudinaryUploadImg(path, "images");
+      for (const image of images) {
+        const { path } = image;
+        const newImage = uploader(path);
+        uploadImages.push(newImage);
+        fs.unlinkSync(path);
+      }
+    }
     res.json(newProduct);
-  } catch (error) {}
+  } catch (error) {
+    throw new Error(error);
+  }
 });
 // update product
 const updateProduct = asyncHandler(async (req, res) => {
@@ -82,6 +96,22 @@ const getAllProduct = asyncHandler(async (req, res) => {
     throw new Error(error);
   }
 });
+// search product
+const searchProductByName = asyncHandler(async (req, res) => {
+  const { productName } = req.query;
+
+  try {
+    // Tìm sản phẩm dựa trên tên sản phẩm
+    const products = await Product.find({
+      title: { $regex: new RegExp(productName, "i") }, // Sử dụng biểu thức chính quy không phân biệt chữ hoa chữ thường
+    });
+
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to search products", error: error.message });
+  }
+});
+
 // get product by id
 const getaProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -204,15 +234,22 @@ const uploadImages = asyncHandler(async (req, res) => {
 const deleteImages = asyncHandler(async (req, res) => {
   const { id } = req.params;
   try {
-    const deleted = cloudinaryDeleteImg(id, "images");
-    res.json({ message: "deleted" });
+    console.log(id);
+    const deleted = await cloudinaryDeleteImg(id, "images");
+    if (deleted) {
+      res.json({ message: "Image deleted successfully" });
+    } else {
+      res.status(404).json({ message: "Image not found or could not be deleted" });
+    }
   } catch (error) {
-    throw new Error(error);
+    res.status(500).json({ message: "Failed to delete image", error: error });
   }
 });
+
 module.exports = {
   createProduct,
   getAllProduct,
+  searchProductByName,
   getaProduct,
   updateProduct,
   deleteProduct,

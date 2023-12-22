@@ -23,6 +23,7 @@ const {
   createOrder,
   getOrder,
   updateOrderStatus,
+  removeProductInCart,
 } = require("../controller/userCtrl");
 const { authMiddleware, isAdmin } = require("../middlewares/authMiddleware");
 const router = express.Router();
@@ -37,6 +38,7 @@ router.post("/cart", authMiddleware, addProductToCart);
 router.post("/cart/apply-coupon", authMiddleware, applyCoupon);
 router.post("/cart/cash-order", authMiddleware, createOrder);
 router.delete("/cart", authMiddleware, emptyCart);
+router.delete("/cart/delete-by-id/:id", authMiddleware, removeProductInCart);
 router.get("/all-user", getAllUser);
 router.get("/get-order", authMiddleware, getOrder);
 router.get("/refresh", handleRefeshToken);

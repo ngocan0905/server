@@ -17,16 +17,17 @@ const cloudinaryUploadImg = async (fileToUploads) => {
     });
   });
 };
-const cloudinaryDeleteImg = async (fileToDelete) => {
+const cloudinaryDeleteImg = (fileToDelete) => {
   return new Promise((resolve) => {
     cloudinary.uploader.destroy(fileToDelete, (result) => {
-      resolve(
-        { url: result.secure_url, asset_id: result.asset_id, public_id: result.public_id },
-        {
-          resource_type: "auto",
-        }
-      );
+      if (result.result === "ok" && result.deleted === "true") {
+        resolve({ message: "Image deleted successfully" });
+      } else {
+        const errorMessage = result ? result.error : "Failed to delete image";
+        resolve({ error: errorMessage });
+      }
     });
   });
 };
+
 module.exports = { cloudinaryUploadImg, cloudinaryDeleteImg };

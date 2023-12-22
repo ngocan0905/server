@@ -167,6 +167,7 @@ const dislikeBlog = asyncHandler(async (req, res) => {
     res.json(blog);
   }
 });
+// upload img
 const uploadImages = asyncHandler(async (req, res) => {
   try {
     const uploader = (path) => cloudinaryUploadImg(path, "images");

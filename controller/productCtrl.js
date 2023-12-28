@@ -13,7 +13,7 @@ const createProduct = asyncHandler(async (req, res) => {
       req.body.slug = slugify(title);
     }
     const newProduct = await Product.create(req.body);
-    if (images & (images.length > 0)) {
+    if (images && images.length > 0) {
       const uploadImages = [];
       const uploader = (path) => cloudinaryUploadImg(path, "images");
       for (const image of images) {
@@ -245,6 +245,64 @@ const deleteImages = asyncHandler(async (req, res) => {
     res.status(500).json({ message: "Failed to delete image", error: error });
   }
 });
+// add tag to product
+const addTags = asyncHandler(async (req, res) => {
+  const { productId, tags } = req.body;
+  try {
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    if (!Array.isArray(tags) || tags.length === 0) {
+      return res.status(400).json({ message: "Please provide valid tags in an array" });
+    }
+
+    for (const tag of tags) {
+      if (!product.tags.includes(tag)) {
+        product.tags.push(tag); // Thêm tag mới vào mảng tags của sản phẩm
+      }
+    }
+
+    await product.save();
+
+    res.json({ message: "Tags added successfully", product });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to add tags to product", error: error.message });
+  }
+});
+
+// delete tag from product
+const deleteTag = asyncHandler(async (req, res) => {
+  const productId = req.params.id;
+  const { tagToDelete } = req.body;
+  validateMongoDbId(productId);
+  try {
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    if (!tagToDelete || typeof tagToDelete !== "string") {
+      return res.status(400).json({ message: "Please provide a valid tag to delete" });
+    }
+
+    const initialTagsLength = product.tags.length;
+    product.tags = product.tags.filter((tag) => tag !== tagToDelete);
+
+    if (product.tags.length === initialTagsLength) {
+      return res.status(404).json({ message: "Tag not found in product" });
+    }
+
+    await product.save();
+
+    res.json({ message: `Tag '${tagToDelete}' deleted successfully`, product });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete tag from product", error: error.message });
+  }
+});
 
 module.exports = {
   createProduct,
@@ -257,4 +315,6 @@ module.exports = {
   rating,
   uploadImages,
   deleteImages,
+  addTags,
+  deleteTag,
 };

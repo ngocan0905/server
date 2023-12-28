@@ -10,6 +10,8 @@ const {
   uploadImages,
   deleteImages,
   searchProductByName,
+  addTags,
+  deleteTag,
 } = require("../controller/productCtrl");
 const { authMiddleware, isAdmin } = require("../middlewares/authMiddleware");
 const { uploadPhoto, productImgResize } = require("../middlewares/uploadImages");
@@ -29,7 +31,10 @@ router.get("/search", searchProductByName);
 router.get("/:id", getaProduct);
 router.put("/wishlist", authMiddleware, addToWishList);
 router.put("/rating", authMiddleware, rating);
-router.put("/:id", authMiddleware, isAdmin, updateProduct);
+router.post("/tag", authMiddleware, isAdmin, addTags);
+router.patch("/:id", authMiddleware, isAdmin, updateProduct);
+router.delete("/tag/:id", authMiddleware, isAdmin, deleteTag);
 router.delete("/delete-img/:id", authMiddleware, isAdmin, deleteImages);
 router.delete("/:id", authMiddleware, isAdmin, deleteProduct);
+
 module.exports = router;

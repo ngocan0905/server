@@ -1,30 +1,39 @@
-const mongoose = require("mongoose"); // Erase if already required
+const mongoose = require("mongoose");
 
-// Declare the Schema of the Mongo model
-var orderSchema = new mongoose.Schema(
+const orderSchema = new mongoose.Schema(
   {
     products: [
       {
         product: {
           type: mongoose.Schema.Types.ObjectId,
-          ref: "product",
+          ref: "product", // Thay "product" bằng tên model của sản phẩm
         },
         count: Number,
         color: String,
       },
     ],
-    paymentIntent: {},
+    paymentIntent: {
+      // Thêm các trường thông tin liên quan đến thanh toán từ Stripe
+      id: String,
+      method: {
+        type: String,
+        enum: ["Stripe", "PayPal", "CreditCard"], // Có thể thêm các phương thức thanh toán khác
+      },
+      amount: Number,
+      status: {
+        type: String,
+        default: "Paid",
+        enum: ["Paid"],
+      },
+      created: Date,
+      currency: String,
+      name: String,
+      email: String,
+    },
     orderStatus: {
       type: String,
-      default: "Not processed",
-      enum: [
-        "Not processed",
-        "Cash on delivery",
-        "Processing",
-        "Dispatched",
-        "Cancelled",
-        "Delivered",
-      ],
+      default: "Paid",
+      enum: ["Paid"],
     },
     orderby: {
       type: mongoose.Schema.Types.ObjectId,
@@ -34,5 +43,4 @@ var orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-//Export the model
 module.exports = mongoose.model("order", orderSchema);

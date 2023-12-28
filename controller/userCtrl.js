@@ -10,6 +10,9 @@ const validateMongoDbId = require("../utils/validateMongodbId");
 const { generateRefreshToken } = require("../config/refreshToken");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
+const stripe = require("stripe")(
+  "sk_test_51OMpt3ABlcms0qAX9k2e61WDlo0hdjPN8vf1svKasohmQjkKIIC3d9A5VgLKBOqA0kKCtWbh7Hkb4QxiF5BjVmJh00kxhAhqbG"
+);
 const sendEmail = require("./emailCtrl");
 // create user
 const createUser = asyncHandler(async (req, res) => {
@@ -29,34 +32,45 @@ const createUser = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  const findUser = await User.findOne({ email });
-  if (findUser && (await findUser.isPasswordMatched(password))) {
-    const refreshToken = await generateRefreshToken(findUser?._id);
-    const updateuser = await User.findByIdAndUpdate(
-      findUser.id,
-      {
-        refreshToken: refreshToken,
-      },
-      {
-        new: true,
-      }
-    );
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      maxAge: 72 * 60 * 60 * 1000,
-    });
-    res.json({
-      _id: findUser?._id,
-      firstname: findUser?.firstName,
-      lastname: findUser?.lastName,
-      email: findUser?.email,
-      mobile: findUser?.mobile,
-      wishlist: findUser?.wishlist,
-      token: generateToken(findUser?._id),
-    });
-  } else {
-    throw new Error("Invalid Credentials");
+  // Kiểm tra email và password có tồn tại không
+  if (!email || !password) {
+    res.status(400).json({ message: "Email and password are required" });
+    return;
   }
+
+  const user = await User.findOne({ email });
+  if (!user || !(await user.isPasswordMatched(password))) {
+    res.status(401).json({ message: "Invalid credentials" });
+    return;
+  }
+
+  let responseData = {
+    _id: user._id,
+    firstname: user.firstName,
+    lastname: user.lastName,
+    email: user.email,
+    mobile: user.mobile,
+    role: user.role,
+    token: generateToken(user._id),
+  };
+
+  if (user.role === "admin") {
+    const refreshToken = generateRefreshToken(user._id);
+    await User.findByIdAndUpdate(user._id, { refreshToken }, { new: true });
+
+    responseData = {
+      ...responseData,
+      refreshToken,
+      role: user.role,
+    };
+  }
+
+  res.cookie("refreshToken", responseData.refreshToken, {
+    httpOnly: true,
+    maxAge: 72 * 60 * 60 * 1000,
+  });
+
+  res.json(responseData);
 });
 // login admin
 const loginAdmin = asyncHandler(async (req, res) => {
@@ -430,45 +444,87 @@ const applyCoupon = asyncHandler(async (req, res) => {
 //
 const createOrder = asyncHandler(async (req, res) => {
   const { _id } = req.user;
-
-  const { COD, couponApplied } = req.body;
+  const { paymentMethodId, amount } = req.body;
   try {
-    if (!COD) throw new Error("Create cash order failed");
+    // Lấy thông tin giỏ hàng của người dùng
     const user = await User.findById(_id);
-    let userCart = await Cart.findOne({ orderby: user._id });
-    let finalAmount = 0;
-    if (couponApplied && userCart.totalAfterDiscount) {
-      finalAmount = userCart.totalAfterDiscount;
-    } else {
-      finalAmount = userCart.cartTotal;
-    }
-    let newOrder = await new Order({
-      products: userCart.products,
+    const userCart = await Cart.findOne({ orderby: user._id });
+
+    // Tính toán số tiền cuối cùng cho đơn hàng
+    // const finalAmount = userCart.totalAfterDiscount || userCart.cartTotal;
+
+    // Thực hiện thanh toán qua Stripe và nhận kết quả trả về từ hàm xử lý thanh toán
+    const paymentResponse = await processPayment(paymentMethodId, amount);
+
+    // Xử lý sau khi thanh toán thành công
+    const { clientSecret } = paymentResponse;
+
+    // Tạo đơn hàng sau khi thanh toán thành công
+    const newOrder = await createOrderAfterPayment(_id, amount, userCart.products);
+    await Cart.findOneAndDelete({ orderby: user._id });
+    // Trả về kết quả cho người dùng
+    res.json({ message: "Order created successfully after payment", clientSecret });
+  } catch (error) {
+    console.error("Error creating order:", error.message);
+    res.status(500).json({ error: "Có lỗi xảy ra khi tạo đơn hàng và xử lý thanh toán" });
+  }
+});
+const processPayment = async (paymentMethodId, amount) => {
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      payment_method: paymentMethodId,
+      amount: amount * 100, // Số tiền thanh toán, ví dụ: 1000 đơn vị (đã được chuyển đổi sang đơn vị tiền tệ của bạn)
+      currency: "usd", // Đơn vị tiền tệ của bạn
+      description: "Mô tả thanh toán",
+      confirm: true,
+      return_url: "http://localhost:5173/",
+    });
+
+    // Xử lý sau khi thanh toán, nếu cần thiết
+    return { clientSecret: paymentIntent.client_secret };
+  } catch (error) {
+    throw new Error(error.message);
+  }
+};
+// Hàm tạo đơn hàng sau khi thanh toán
+const createOrderAfterPayment = async (_id, finalAmount, products) => {
+  try {
+    const newOrder = await new Order({
+      products,
       paymentIntent: {
         id: uniqid(),
-        method: "COD",
+        method: "Stripe",
         amount: finalAmount,
-        status: "Cash on delivery",
+        status: "Paid",
         created: Date.now(),
         currency: "usd",
       },
-      orderby: user._id,
-      orderStatus: "Cash on delivery",
+      orderby: _id,
+      orderStatus: "Paid",
     }).save();
-    let update = userCart.products.map((item) => {
-      return {
-        updateOne: {
-          filter: { _id: item.product._id },
-          update: { $inc: { quantity: -item.count, sold: +item.count } },
-        },
-      };
-    });
-    const updated = await Product.bulkWrite(update, {});
-    res.json({ message: "success" });
+
+    await updateProductInfo(products);
+    return newOrder;
   } catch (error) {
-    throw new Error(error);
+    throw new Error(error.message);
   }
-});
+};
+
+// Hàm cập nhật thông tin sản phẩm sau khi thanh toán thành công
+const updateProductInfo = async (products) => {
+  try {
+    const update = products.map((item) => ({
+      updateOne: {
+        filter: { _id: item.product._id },
+        update: { $inc: { quantity: -item.count, sold: +item.count } },
+      },
+    }));
+
+    await Product.bulkWrite(update, {});
+  } catch (error) {
+    throw new Error(error.message);
+  }
+};
 
 //
 const getOrder = asyncHandler(async (req, res) => {
@@ -502,6 +558,94 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     throw new Error(error);
   }
 });
+const getSoldOrders = asyncHandler(async (req, res) => {
+  try {
+    // Lấy trang và số lượng đơn hàng từ query params
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    // Tính toán vị trí bắt đầu của trang và số lượng đơn hàng cần bỏ qua
+    const startIndex = (page - 1) * limit;
+
+    // Lấy tổng số lượng đơn hàng
+    const totalOrders = await Order.countDocuments();
+
+    // Lấy danh sách các đơn hàng đã bán với phân trang
+    const soldOrders = await Order.find({ orderStatus: { $in: ["Confirmed", "Paid"] } })
+      .skip(startIndex)
+      .limit(limit)
+      .populate("products.product")
+      .exec();
+
+    const allSoldOrders = await Order.find({ orderStatus: { $in: ["Confirmed", "Paid"] } })
+      .populate("products.product")
+      .exec();
+
+    const totalRevenue = allSoldOrders.reduce((total, order) => {
+      return total + order.paymentIntent.amount;
+    }, 0);
+    // Trả về danh sách các đơn hàng đã bán, tổng số lượng đơn hàng và thông tin phân trang cho admin
+    res.json({
+      soldOrders,
+      totalOrders,
+      currentPage: page,
+      totalPages: Math.ceil(totalOrders / limit),
+      totalRevenue: totalRevenue,
+    });
+  } catch (error) {
+    console.error("Error fetching sold orders:", error.message);
+    res.status(500).json({ error: "Có lỗi xảy ra khi lấy danh sách các đơn hàng đã bán" });
+  }
+});
+//
+//get revenue by day
+const getRevenueByDay = asyncHandler(async (req, res) => {
+  try {
+    const { date } = req.params; // Ngày cần lấy doanh thu, có thể được truyền từ frontend hoặc route
+
+    const startDate = new Date(date);
+    const endDate = new Date(date);
+    endDate.setDate(endDate.getDate() + 1); // Tăng ngày lên 1 để lấy hết cả ngày đó
+
+    const ordersByDay = await Order.find({
+      createdAt: { $gte: startDate, $lt: endDate },
+      orderStatus: { $in: ["Confirmed", "Paid"] },
+    });
+
+    const totalRevenueByDay = ordersByDay.reduce((total, order) => {
+      return total + order.paymentIntent.amount;
+    }, 0);
+
+    res.json({ date, totalRevenue: totalRevenueByDay });
+  } catch (error) {
+    console.error("Error fetching revenue by day:", error.message);
+    res.status(500).json({ error: "Có lỗi xảy ra khi lấy doanh thu theo ngày" });
+  }
+});
+// get revenue by month
+const getRevenueByMonth = asyncHandler(async (req, res) => {
+  try {
+    const { year, month } = req.params; // Năm và tháng cần lấy doanh thu
+
+    const startDate = new Date(`${year}-${month}-01`);
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 1); // Tăng tháng lên 1 để lấy hết cả tháng đó
+
+    const ordersByMonth = await Order.find({
+      createdAt: { $gte: startDate, $lt: endDate },
+      orderStatus: { $in: ["Confirmed", "Paid"] },
+    });
+
+    const totalRevenueByMonth = ordersByMonth.reduce((total, order) => {
+      return total + order.paymentIntent.amount;
+    }, 0);
+
+    res.json({ year, month, totalRevenue: totalRevenueByMonth });
+  } catch (error) {
+    console.error("Error fetching revenue by month:", error.message);
+    res.status(500).json({ error: "Có lỗi xảy ra khi lấy doanh thu theo tháng" });
+  }
+});
 module.exports = {
   createUser,
   loginUser,
@@ -527,4 +671,7 @@ module.exports = {
   createOrder,
   getOrder,
   updateOrderStatus,
+  getSoldOrders,
+  getRevenueByDay,
+  getRevenueByMonth,
 };

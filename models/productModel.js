@@ -30,9 +30,9 @@ var productSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    quanlity: {
+    quantity: {
       type: Number,
-      required: true,
+      required: false,
     },
     sold: {
       type: Number,
@@ -49,7 +49,7 @@ var productSchema = new mongoose.Schema(
       },
     ],
     totalrating: {
-      type: String,
+      type: Number,
       default: 0,
     },
   },

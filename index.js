@@ -13,11 +13,10 @@ const brandRouter = require("./routers/brandRoute");
 const couponRouter = require("./routers/couponRoute");
 const colorRouter = require("./routers/colorRoute");
 const enqRouter = require("./routers/enqRoute");
-const paymentRouter = require("./routers/paymentRoute");
 const bodyParser = require("body-parser");
 app.use(function (req, res, next) {
   res.header("Access-Control-Allow-Origin", "http://localhost:5173");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.header("Access-Control-Allow-Credentials", "true");
   next();
@@ -39,7 +38,6 @@ app.use("/api/brand", brandRouter);
 app.use("/api/coupon", couponRouter);
 app.use("/api/color", colorRouter);
 app.use("/api/enquiry", enqRouter);
-app.use("/api/payment", paymentRouter);
 app.use(errorHandler);
 app.use(notFound);
 app.listen(PORT, () => {

@@ -2,47 +2,61 @@ const Coupon = require("../models/couponModel");
 const asyncHandler = require("express-async-handler");
 const validateMongoDbId = require("../utils/validateMongodbId");
 
-//  create coupon
+// Tạo mã coupon mới
 const createCoupon = asyncHandler(async (req, res) => {
   try {
     const coupon = await Coupon.create(req.body);
     res.json(coupon);
   } catch (error) {
-    throw new Error(error);
+    res.status(500).json({ message: error.message });
   }
 });
-// update coupon
+
+// Cập nhật thông tin của coupon
 const updateCoupon = asyncHandler(async (req, res) => {
   const { id } = req.params;
   validateMongoDbId(id);
   try {
-    const newCoupon = await Coupon.findByIdAndUpdate(id, req.body, {
+    const updatedCoupon = await Coupon.findByIdAndUpdate(id, req.body, {
       new: true,
     });
-    res.json(newCoupon);
+    res.json(updatedCoupon);
   } catch (error) {
-    throw new Error(error);
+    res.status(500).json({ message: error.message });
   }
 });
-// delete coupon
+
+// Xóa mã coupon
 const deleteCoupon = asyncHandler(async (req, res) => {
   const { id } = req.params;
   validateMongoDbId(id);
   try {
-    const deleteCoupon = await Coupon.findByIdAndDelete(id);
-    res.json("delete successed");
+    await Coupon.findByIdAndDelete(id);
+    res.json({ message: "Delete successful" });
   } catch (error) {
-    throw new Error(error);
+    res.status(500).json({ message: error.message });
   }
 });
 
-// get all coupon
+// Lấy tất cả các mã coupon
 const getAllCoupon = asyncHandler(async (req, res) => {
   try {
     const allCoupon = await Coupon.find();
     res.json(allCoupon);
   } catch (error) {
-    throw new Error(error);
+    res.status(500).json({ message: error.message });
   }
 });
-module.exports = { createCoupon, updateCoupon, deleteCoupon, getAllCoupon };
+
+// Đánh dấu mã coupon đã sử dụng
+const markCouponAsUsed = asyncHandler(async (req, res) => {
+  const { couponName } = req.params;
+  try {
+    const coupon = await Coupon.markAsUsed(couponName);
+    res.json(coupon);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+module.exports = { createCoupon, updateCoupon, deleteCoupon, getAllCoupon, markCouponAsUsed };

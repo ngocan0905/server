@@ -46,24 +46,21 @@ const loginUser = asyncHandler(async (req, res) => {
 
   let responseData = {
     _id: user._id,
-    firstname: user.firstName,
-    lastname: user.lastName,
+    displayName: user.displayName,
     email: user.email,
     mobile: user.mobile,
     role: user.role,
     token: generateToken(user._id),
   };
 
-  if (user.role === "admin") {
-    const refreshToken = generateRefreshToken(user._id);
-    await User.findByIdAndUpdate(user._id, { refreshToken }, { new: true });
+  const refreshToken = generateRefreshToken(user._id);
+  await User.findByIdAndUpdate(user._id, { refreshToken }, { new: true });
 
-    responseData = {
-      ...responseData,
-      refreshToken,
-      role: user.role,
-    };
-  }
+  responseData = {
+    ...responseData,
+    refreshToken,
+    role: user.role,
+  };
 
   res.cookie("refreshToken", responseData.refreshToken, {
     httpOnly: true,
@@ -72,39 +69,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
   res.json(responseData);
 });
-// login admin
-const loginAdmin = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
 
-  const findAdmin = await User.findOne({ email });
-  if (findAdmin.role !== "admin") throw new Error("Not Authorised");
-  if (findAdmin && (await findAdmin.isPasswordMatched(password))) {
-    const refreshToken = await generateRefreshToken(findAdmin?._id);
-    const updateuser = await User.findByIdAndUpdate(
-      findAdmin.id,
-      {
-        refreshToken: refreshToken,
-      },
-      {
-        new: true,
-      }
-    );
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      maxAge: 72 * 60 * 60 * 1000,
-    });
-    res.json({
-      _id: findAdmin?._id,
-      firstname: findAdmin?.firstName,
-      lastname: findAdmin?.lastName,
-      email: findAdmin?.email,
-      mobile: findAdmin?.mobile,
-      token: generateToken(findAdmin?._id),
-    });
-  } else {
-    throw new Error("Invalid Credentials");
-  }
-});
 // save user address
 const saveAddress = asyncHandler(async (req, res) => {
   const { _id } = req.user;
@@ -164,29 +129,27 @@ const handleRefeshToken = asyncHandler(async (req, res) => {
   });
 });
 // logout user
-const logoutUser = asyncHandler(async (req, res) => {
-  const cookie = req.cookies;
-  if (!cookie.refreshToken) {
-    this.route.params.id("Không có token làm mới trong cookie");
+const logout = asyncHandler(async (req, res) => {
+  try {
+    const { refreshToken } = req.cookies;
+
+    if (!refreshToken) {
+      return res.status(400).json({ error: "Không có refreshToken trong cookie" });
+    }
+
+    const user = await User.findOneAndUpdate({ refreshToken }, { refreshToken: "" }); // Cập nhật refreshToken thành rỗng
+
+    if (!user) {
+      return res.status(404).json({ error: "Người dùng không tồn tại" });
+    }
+
+    res.clearCookie("refreshToken"); // Xóa cookie refreshToken
+
+    return res.json({ message: "Đăng xuất thành công" });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ error: "Đã xảy ra lỗi khi đăng xuất" });
   }
-  const refreshToken = cookie.refreshToken;
-
-  const user = await User.findOneAndUpdate({ refreshToken }, { $set: { refreshToken: "" } });
-
-  if (!user) {
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: true,
-    });
-    return res.sendStatus(204);
-  }
-
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure: true,
-  });
-
-  return res.sendStatus(204);
 });
 
 // update user
@@ -197,8 +160,7 @@ const updateUser = asyncHandler(async (req, res) => {
     const updatedById = await User.findByIdAndUpdate(
       _id,
       {
-        firstName: req?.body?.firstName,
-        lastName: req?.body?.lastName,
+        displayName: req?.body?.displayName,
         mobile: req?.body?.mobile,
         role: req?.body?.role,
       },
@@ -649,8 +611,8 @@ const getRevenueByMonth = asyncHandler(async (req, res) => {
 module.exports = {
   createUser,
   loginUser,
-  loginAdmin,
-  logoutUser,
+
+  logout,
   getAllUser,
   getUser,
   updateUser,

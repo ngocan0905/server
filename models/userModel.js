@@ -5,14 +5,11 @@ const Cart = require("./cartModel");
 // Declare the Schema of the Mongo model
 var userSchema = new mongoose.Schema(
   {
-    firstName: {
+    displayName: {
       type: String,
       required: true,
     },
-    lastName: {
-      type: String,
-      required: true,
-    },
+
     email: {
       type: String,
       required: true,

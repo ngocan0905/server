@@ -1,7 +1,7 @@
-const mongoose = require("mongoose"); // Erase if already required
+const mongoose = require("mongoose");
 
 // Declare the Schema of the Mongo model
-var couponSchema = new mongoose.Schema({
+const couponSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
@@ -16,7 +16,32 @@ var couponSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  isUsed: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-//Export the model
-module.exports = mongoose.model("coupon", couponSchema);
+// Phương thức để đánh dấu mã Coupon đã sử dụng
+couponSchema.statics.markAsUsed = async function (couponName) {
+  try {
+    const Coupon = this; // Lấy reference tới model Coupon
+    const coupon = await Coupon.findOne({ name: couponName });
+    if (!coupon) {
+      throw new Error("Coupon not found");
+    }
+    if (coupon.isUsed) {
+      throw new Error("Coupon has already been used");
+    }
+    coupon.isUsed = true;
+    await coupon.save();
+    return coupon;
+  } catch (error) {
+    throw new Error(error.message);
+  }
+};
+
+// Tạo model từ schema
+const Coupon = mongoose.model("coupon", couponSchema);
+
+module.exports = Coupon;

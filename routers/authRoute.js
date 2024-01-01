@@ -8,12 +8,11 @@ const {
   blockUser,
   unblockUser,
   handleRefeshToken,
-  logoutUser,
+  logout,
   updatePassword,
   forgotPasswordToken,
   resetPassword,
   loginUser,
-  loginAdmin,
   getWishList,
   saveAddress,
   addProductToCart,
@@ -36,7 +35,6 @@ router.put("/reset-password/:token", resetPassword);
 router.put("/order/update-order/:id", authMiddleware, isAdmin, updateOrderStatus);
 router.put("/password", authMiddleware, updatePassword);
 router.post("/login", loginUser);
-router.post("/admin-login", loginAdmin);
 router.post("/cart", authMiddleware, addProductToCart);
 router.post("/cart/apply-coupon", authMiddleware, applyCoupon);
 router.post("/cart/create-order", authMiddleware, createOrder);
@@ -48,7 +46,7 @@ router.get("/chart/month/:year/:month", getRevenueByMonth);
 router.get("/get-order", authMiddleware, getOrder);
 router.get("/sold-order", getSoldOrders);
 router.get("/refresh", handleRefeshToken);
-router.get("/logout", authMiddleware, logoutUser);
+router.get("/logout", authMiddleware, logout);
 router.get("/wishlist", authMiddleware, getWishList);
 router.get("/cart", authMiddleware, getUserCart);
 router.get("/:id", getUser);

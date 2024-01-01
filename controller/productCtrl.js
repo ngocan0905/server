@@ -67,11 +67,14 @@ const getAllProduct = asyncHandler(async (req, res) => {
     queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
     let query = Product.find(JSON.parse(queryStr));
     // sorting
-    if (req.query.sort) {
-      const sortBy = req.query.sort.split(",").join(" ");
-      query = query.sort(sortBy);
+    if (req.query.sort === "price_desc") {
+      query = query.sort("-price");
+    } else if (req.query.sort === "price_asc") {
+      query = query.sort("price");
+    } else if (req.query.sort === "sold_desc") {
+      query = query.sort("-soldQuantity");
     } else {
-      query = query.sort("-createdAt");
+      query = query.sort("-createdAt"); // Default sorting
     }
     // limiting the fields
     if (req.query.fields) {
@@ -162,6 +165,11 @@ const addToWishList = asyncHandler(async (req, res) => {
 const rating = asyncHandler(async (req, res) => {
   const { _id } = req.user;
   const { star, prodId, comment } = req.body;
+  let sanitizedComment = comment;
+  const profanityWords = /\b(cặc|lồn|cu|cc|lol|buồi|chết|đụ|dm|cl)\b/gi;
+  sanitizedComment = sanitizedComment.replace(profanityWords, (match) => {
+    return "*".repeat(match.length);
+  });
   try {
     const product = await Product.findById(prodId);
     let alreadyRated = product.ratings.find(
@@ -173,7 +181,7 @@ const rating = asyncHandler(async (req, res) => {
           ratings: { $elemMatch: alreadyRated },
         },
         {
-          $set: { "ratings.$.star": star, "ratings.$.comment": comment },
+          $set: { "ratings.$.star": star, "ratings.$.comment": sanitizedComment },
         },
         { new: true }
       );
@@ -184,7 +192,7 @@ const rating = asyncHandler(async (req, res) => {
           $push: {
             ratings: {
               star: star,
-              comment: comment,
+              comment: sanitizedComment,
               postedby: _id,
             },
           },
